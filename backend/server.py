@@ -437,6 +437,38 @@ async def analyze_document(payload: AIAnalyzeRequest):
         raise HTTPException(500, f"Erreur d'analyse IA: {str(e)}")
 
 
+# --- Export complet (sauvegarde avant résiliation) ---
+@api_router.get("/export")
+async def export_all():
+    pets = await db.pets.find({}, {"_id": 0}).to_list(100)
+    rations = await db.rations.find({}, {"_id": 0}).to_list(10000)
+    appointments = await db.appointments.find({}, {"_id": 0}).to_list(10000)
+    vetfiles = await db.vetfiles.find({}, {"_id": 0}).to_list(10000)
+    weights = await db.weights.find({}, {"_id": 0}).to_list(10000)
+    journal = await db.journal.find({}, {"_id": 0}).to_list(10000)
+    walks = await db.walks.find({}, {"_id": 0}).to_list(10000)
+    shares = await db.shares.find({}, {"_id": 0}).to_list(1000)
+
+    return JSONResponse(
+        content={
+            "app": "Compagnons",
+            "version": 1,
+            "exported_at": now_iso(),
+            "pets": pets,
+            "rations": rations,
+            "appointments": appointments,
+            "vetfiles": vetfiles,
+            "weights": weights,
+            "journal": journal,
+            "walks": walks,
+            "shares": shares,
+        },
+        headers={
+            "Content-Disposition": 'attachment; filename="compagnons-export.json"'
+        },
+    )
+
+
 # --- Shares (dossier véto partagé) ---
 @api_router.get("/shares", response_model=List[ShareLink])
 async def list_shares(pet_id: str):

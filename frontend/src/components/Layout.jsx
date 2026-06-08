@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { AnimalSelector } from "./AnimalSelector";
+import { ExportButton } from "./ExportButton";
 import { Home, UtensilsCrossed, Stethoscope, Scale, BookHeart, Footprints } from "lucide-react";
 import { useAnimal } from "@/context/AnimalContext";
 
@@ -29,7 +30,10 @@ export const Layout = () => {
               <div className="text-[10px] uppercase tracking-[0.18em] text-[#8A9A8E]">Zelda & Maddie</div>
             </div>
           </div>
-          <AnimalSelector />
+          <div className="flex items-center gap-2">
+            <AnimalSelector />
+            <ExportButton />
+          </div>
         </div>
       </header>
 
