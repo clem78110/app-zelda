@@ -138,7 +138,6 @@ export default function Rations() {
                   <SelectTrigger data-testid="ration-type"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ration ménagère">Ration ménagère</SelectItem>
-                    <SelectItem value="croquettes">Croquettes</SelectItem>
                     <SelectItem value="pâtée">Pâtée</SelectItem>
                     <SelectItem value="mixte">Mixte</SelectItem>
                   </SelectContent>
