@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, UtensilsCrossed, X } from "lucide-react";
+import { Plus, Trash2, UtensilsCrossed, X, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
 const DEFAULT_PROTEINS = [
@@ -35,6 +35,7 @@ export default function Rations() {
   const { activePet } = useAnimal();
   const [items, setItems] = useState([]);
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [customProtein, setCustomProtein] = useState("");
 
@@ -90,22 +91,52 @@ export default function Rations() {
 
     if (daily <= 0) return toast.error("Indiquez une quantité quotidienne");
 
+    const payload = {
+      ...form,
+      brand: form.brand || (isMenagere ? "Ration maison" : ""),
+      pet_id: activePet.id,
+      daily_grams: daily,
+      meals_per_day: Number(form.meals_per_day),
+      proteins: proteinsClean,
+    };
+
     try {
-      await api.post("/rations", {
-        ...form,
-        brand: form.brand || (isMenagere ? "Ration maison" : ""),
-        pet_id: activePet.id,
-        daily_grams: daily,
-        meals_per_day: Number(form.meals_per_day),
-        proteins: proteinsClean,
-      });
-      toast.success("Ration enregistrée");
+      if (editingId) {
+        await api.patch(`/rations/${editingId}`, payload);
+        toast.success("Ration mise à jour");
+      } else {
+        await api.post("/rations", payload);
+        toast.success("Ration enregistrée");
+      }
       setOpen(false);
+      setEditingId(null);
       setForm(emptyForm);
       setCustomProtein("");
       load();
     } catch (e) {
       toast.error("Enregistrement impossible");
+    }
+  };
+
+  const openEdit = (r) => {
+    setEditingId(r.id);
+    setForm({
+      brand: r.brand || "",
+      food_type: r.food_type || "ration ménagère",
+      daily_grams: r.daily_grams || 0,
+      meals_per_day: r.meals_per_day || 2,
+      proteins: (r.proteins || []).map((p) => ({ name: p.name, grams: p.grams })),
+      notes: r.notes || "",
+    });
+    setOpen(true);
+  };
+
+  const resetDialog = (v) => {
+    setOpen(v);
+    if (!v) {
+      setEditingId(null);
+      setForm(emptyForm);
+      setCustomProtein("");
     }
   };
 
@@ -123,14 +154,14 @@ export default function Rations() {
           <h1 className="text-3xl font-extrabold" style={{ fontFamily: "Manrope" }}>Rations</h1>
           <p className="text-sm text-[#5C6B60]">Alimentation actuelle et historique</p>
         </div>
-        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setForm(emptyForm); setCustomProtein(""); } }}>
+        <Dialog open={open} onOpenChange={resetDialog}>
           <DialogTrigger asChild>
             <Button data-testid="add-ration-btn" className="rounded-full bg-[#4A7C59] hover:bg-[#3B6347]">
               <Plus size={16} className="mr-1" /> Nouvelle ration
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-md max-h-[88vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>Nouvelle ration</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{editingId ? "Modifier la ration" : "Nouvelle ration"}</DialogTitle></DialogHeader>
             <div className="space-y-3">
               <div>
                 <Label>Type</Label>
@@ -246,19 +277,34 @@ export default function Rations() {
                 <Label>Notes (recette, supplémentation…)</Label>
                 <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} />
               </div>
-              <Button data-testid="save-ration-btn" onClick={submit} className="w-full rounded-full bg-[#4A7C59] hover:bg-[#3B6347]">Enregistrer</Button>
+              <Button data-testid="save-ration-btn" onClick={submit} className="w-full rounded-full bg-[#4A7C59] hover:bg-[#3B6347]">{editingId ? "Mettre à jour" : "Enregistrer"}</Button>
             </div>
           </DialogContent>
         </Dialog>
       </div>
 
       {current && (
-        <Card data-testid="current-ration" className="p-6 rounded-3xl border border-[#E9E3D3] bg-gradient-to-br from-white to-[#D0E5D8]/40">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-2xl bg-[#4A7C59] text-white flex items-center justify-center">
-              <UtensilsCrossed size={20} />
+        <Card
+          data-testid="current-ration"
+          onClick={() => openEdit(current)}
+          className="p-6 rounded-3xl border border-[#E9E3D3] bg-gradient-to-br from-white to-[#D0E5D8]/40 cursor-pointer hover:-translate-y-0.5 transition-transform"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-[#4A7C59] text-white flex items-center justify-center">
+                <UtensilsCrossed size={20} />
+              </div>
+              <Badge className="bg-[#4A7C59] hover:bg-[#4A7C59]">Actuelle</Badge>
             </div>
-            <Badge className="bg-[#4A7C59] hover:bg-[#4A7C59]">Actuelle</Badge>
+            <Button
+              data-testid="edit-current-ration"
+              variant="ghost"
+              size="sm"
+              onClick={(e) => { e.stopPropagation(); openEdit(current); }}
+              className="text-[#4A7C59] hover:bg-[#4A7C59]/10 rounded-full text-xs"
+            >
+              <Pencil size={14} className="mr-1" /> Modifier
+            </Button>
           </div>
           <div className="text-2xl font-extrabold" style={{ fontFamily: "Manrope" }}>{current.brand}</div>
           <div className="text-sm text-[#5C6B60] mt-1">{current.food_type}</div>
@@ -303,8 +349,8 @@ export default function Rations() {
           <h2 className="text-lg font-bold mb-3" style={{ fontFamily: "Manrope" }}>Historique</h2>
           <div className="space-y-2">
             {history.map((r) => (
-              <Card key={r.id} className="p-4 rounded-2xl border border-[#E9E3D3] flex items-center justify-between gap-3">
-                <div className="min-w-0">
+              <Card key={r.id} className="p-4 rounded-2xl border border-[#E9E3D3] flex items-center justify-between gap-3 hover:bg-[#F2EFE9]/40 transition">
+                <button onClick={() => openEdit(r)} className="text-left flex-1 min-w-0" data-testid={`edit-ration-${r.id}`}>
                   <div className="font-semibold truncate">{r.brand} · <span className="text-[#5C6B60] font-normal">{r.food_type}</span></div>
                   {r.proteins?.length > 0 && (
                     <div className="text-xs text-[#5C6B60] mt-0.5 truncate">
@@ -312,7 +358,7 @@ export default function Rations() {
                     </div>
                   )}
                   <div className="text-xs text-[#8A9A8E]">{r.daily_grams}g/j — {new Date(r.started_on).toLocaleDateString("fr-FR")}</div>
-                </div>
+                </button>
                 <Button data-testid={`delete-ration-${r.id}`} variant="ghost" size="icon" onClick={() => remove(r.id)}>
                   <Trash2 size={16} className="text-[#B75D5D]" />
                 </Button>

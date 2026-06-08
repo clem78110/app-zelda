@@ -263,6 +263,20 @@ async def create_ration(payload: RationCreate):
     return ration
 
 
+@api_router.patch("/rations/{ration_id}", response_model=Ration)
+async def update_ration(ration_id: str, payload: RationCreate):
+    existing = await db.rations.find_one({"id": ration_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(404, "Ration introuvable")
+    update = payload.model_dump()
+    # Convert ProteinItem models if needed
+    if update.get("proteins"):
+        update["proteins"] = [p if isinstance(p, dict) else p.model_dump() for p in update["proteins"]]
+    await db.rations.update_one({"id": ration_id}, {"$set": update})
+    merged = {**existing, **update}
+    return Ration(**merged)
+
+
 @api_router.delete("/rations/{ration_id}")
 async def delete_ration(ration_id: str):
     res = await db.rations.delete_one({"id": ration_id})
