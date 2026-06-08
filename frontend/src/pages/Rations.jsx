@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, UtensilsCrossed, X, Pencil } from "lucide-react";
 import { toast } from "sonner";
+import Supplements from "@/components/Supplements";
 
 const DEFAULT_PROTEINS = [
   { key: "Dinde", emoji: "🦃" },
@@ -374,6 +375,10 @@ export default function Rations() {
           <p>Aucune ration enregistrée pour {activePet?.name}.</p>
         </div>
       )}
+
+      <div className="pt-4 border-t border-[#E9E3D3]">
+        <Supplements petId={activePet?.id} />
+      </div>
     </div>
   );
 }

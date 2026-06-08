@@ -15,6 +15,8 @@ from typing import List, Optional
 from datetime import datetime, timezone
 
 from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+from PIL import Image
+from io import BytesIO
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -110,6 +112,7 @@ class VetFile(BaseModel):
     category: str = "document"  # ordonnance / vaccin / facture / radio / autre
     mime_type: str
     file_base64: str  # full data url or pure base64
+    thumbnail_base64: Optional[str] = ""  # small preview for image files
     ai_summary: Optional[str] = ""
     notes: Optional[str] = ""
     created_at: str = Field(default_factory=now_iso)
@@ -122,6 +125,48 @@ class VetFileCreate(BaseModel):
     mime_type: str
     file_base64: str
     notes: Optional[str] = ""
+
+
+def make_thumbnail(b64_data: str, mime: str, max_size: int = 280) -> str:
+    """Generate a small JPEG/PNG thumbnail data URL from an image base64. Empty string on failure."""
+    if not mime or not mime.startswith("image/"):
+        return ""
+    try:
+        raw = b64_data.split(",", 1)[-1]
+        img = Image.open(BytesIO(base64.b64decode(raw)))
+        img.thumbnail((max_size, max_size), Image.LANCZOS)
+        out = BytesIO()
+        fmt = "JPEG"
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+        img.save(out, format=fmt, quality=72, optimize=True)
+        return f"data:image/jpeg;base64,{base64.b64encode(out.getvalue()).decode()}"
+    except Exception:
+        return ""
+
+
+class Supplement(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    pet_id: str
+    name: str
+    brand: Optional[str] = ""
+    dose: str = ""  # ex: "5 ml", "1 gélule"
+    frequency: str = ""  # ex: "1x par jour", "matin et soir"
+    notes: Optional[str] = ""
+    started_on: str = Field(default_factory=now_iso)
+    is_active: bool = True
+
+
+class SupplementCreate(BaseModel):
+    pet_id: str
+    name: str
+    brand: Optional[str] = ""
+    dose: str = ""
+    frequency: str = ""
+    notes: Optional[str] = ""
+    is_active: bool = True
+
 
 
 class WeightEntry(BaseModel):
@@ -283,6 +328,38 @@ async def delete_ration(ration_id: str):
     return {"deleted": res.deleted_count}
 
 
+# --- Supplements (compléments alimentaires) ---
+@api_router.get("/supplements", response_model=List[Supplement])
+async def list_supplements(pet_id: str):
+    items = await db.supplements.find({"pet_id": pet_id}, {"_id": 0}).sort("started_on", -1).to_list(500)
+    return items
+
+
+@api_router.post("/supplements", response_model=Supplement)
+async def create_supplement(payload: SupplementCreate):
+    s = Supplement(**payload.model_dump())
+    await db.supplements.insert_one(s.model_dump())
+    return s
+
+
+@api_router.patch("/supplements/{sup_id}", response_model=Supplement)
+async def update_supplement(sup_id: str, payload: SupplementCreate):
+    existing = await db.supplements.find_one({"id": sup_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(404, "Complément introuvable")
+    update = payload.model_dump()
+    await db.supplements.update_one({"id": sup_id}, {"$set": update})
+    merged = {**existing, **update}
+    return Supplement(**merged)
+
+
+@api_router.delete("/supplements/{sup_id}")
+async def delete_supplement(sup_id: str):
+    res = await db.supplements.delete_one({"id": sup_id})
+    return {"deleted": res.deleted_count}
+
+
+
 # --- Vet appointments ---
 @api_router.get("/appointments", response_model=List[VetAppointment])
 async def list_appointments(pet_id: str):
@@ -333,9 +410,26 @@ async def get_file(file_id: str):
 
 @api_router.post("/files", response_model=VetFile)
 async def create_file(payload: VetFileCreate):
-    vf = VetFile(**payload.model_dump())
+    thumb = make_thumbnail(payload.file_base64, payload.mime_type)
+    vf = VetFile(**payload.model_dump(), thumbnail_base64=thumb)
     await db.vetfiles.insert_one(vf.model_dump())
     return vf
+
+
+@api_router.post("/files/backfill-thumbnails")
+async def backfill_thumbnails():
+    """One-shot: generate thumbnails for existing image files that don't have one."""
+    cursor = db.vetfiles.find({"$or": [{"thumbnail_base64": ""}, {"thumbnail_base64": {"$exists": False}}]})
+    updated = 0
+    async for doc in cursor:
+        mime = doc.get("mime_type", "")
+        if not mime.startswith("image/"):
+            continue
+        thumb = make_thumbnail(doc.get("file_base64", ""), mime)
+        if thumb:
+            await db.vetfiles.update_one({"id": doc["id"]}, {"$set": {"thumbnail_base64": thumb}})
+            updated += 1
+    return {"updated": updated}
 
 
 @api_router.delete("/files/{file_id}")
@@ -462,6 +556,7 @@ async def export_all():
     journal = await db.journal.find({}, {"_id": 0}).to_list(10000)
     walks = await db.walks.find({}, {"_id": 0}).to_list(10000)
     shares = await db.shares.find({}, {"_id": 0}).to_list(1000)
+    supplements = await db.supplements.find({}, {"_id": 0}).to_list(10000)
 
     return JSONResponse(
         content={
@@ -476,6 +571,7 @@ async def export_all():
             "journal": journal,
             "walks": walks,
             "shares": shares,
+            "supplements": supplements,
         },
         headers={
             "Content-Disposition": 'attachment; filename="compagnons-export.json"'

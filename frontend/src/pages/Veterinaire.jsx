@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
-import { Plus, Trash2, CalendarDays, FileImage, Sparkles, Upload, Check, Clock, List, CalendarRange } from "lucide-react";
+import { Plus, Trash2, CalendarDays, FileImage, FileText, Sparkles, Upload, Check, Clock, List, CalendarRange } from "lucide-react";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
 import { ShareDialog } from "@/components/ShareDialog";
@@ -443,21 +443,36 @@ const Files = ({ files, reload, petId }) => {
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {files.map((f) => (
-            <Card key={f.id} data-testid={`file-card-${f.id}`} className="p-4 rounded-2xl border border-[#E9E3D3] hover:-translate-y-1 transition-transform">
-              <button onClick={() => openFile(f.id)} className="text-left w-full">
-                <div className="w-full aspect-square rounded-xl bg-[#F2EFE9] flex items-center justify-center mb-3">
-                  <FileImage size={28} className="text-[#8A9A8E]" strokeWidth={1.5} />
-                </div>
-                <Badge variant="outline" className="text-[10px] border-[#E9E3D3] mb-1">{f.category}</Badge>
-                <div className="font-semibold text-sm line-clamp-2">{f.title}</div>
-                <div className="text-[10px] text-[#8A9A8E] mt-1">{new Date(f.created_at).toLocaleDateString("fr-FR")}</div>
-              </button>
-              <Button data-testid={`delete-file-${f.id}`} variant="ghost" size="sm" onClick={() => remove(f.id)} className="mt-2 w-full text-[#B75D5D] hover:bg-[#B75D5D]/10">
-                <Trash2 size={14} className="mr-1" /> Supprimer
-              </Button>
-            </Card>
-          ))}
+          {files.map((f) => {
+            const isImage = f.mime_type?.startsWith("image/");
+            const isPdf = f.mime_type === "application/pdf";
+            return (
+              <Card key={f.id} data-testid={`file-card-${f.id}`} className="p-3 rounded-2xl border border-[#E9E3D3] hover:-translate-y-1 transition-transform">
+                <button onClick={() => openFile(f.id)} className="text-left w-full">
+                  <div className="w-full aspect-square rounded-xl overflow-hidden bg-[#F2EFE9] mb-3 relative">
+                    {isImage && f.thumbnail_base64 ? (
+                      <img src={f.thumbnail_base64} alt={f.title} className="w-full h-full object-cover" loading="lazy" />
+                    ) : isPdf ? (
+                      <div className="w-full h-full flex flex-col items-center justify-center text-[#8A9A8E]">
+                        <FileText size={28} strokeWidth={1.5} />
+                        <span className="text-[10px] font-bold mt-1">PDF</span>
+                      </div>
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <FileImage size={28} className="text-[#8A9A8E]" strokeWidth={1.5} />
+                      </div>
+                    )}
+                  </div>
+                  <Badge variant="outline" className="text-[10px] border-[#E9E3D3] mb-1">{f.category}</Badge>
+                  <div className="font-semibold text-sm line-clamp-2">{f.title}</div>
+                  <div className="text-[10px] text-[#8A9A8E] mt-1">{new Date(f.created_at).toLocaleDateString("fr-FR")}</div>
+                </button>
+                <Button data-testid={`delete-file-${f.id}`} variant="ghost" size="sm" onClick={() => remove(f.id)} className="mt-2 w-full text-[#B75D5D] hover:bg-[#B75D5D]/10">
+                  <Trash2 size={14} className="mr-1" /> Supprimer
+                </Button>
+              </Card>
+            );
+          })}
         </div>
       )}
 
