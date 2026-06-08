@@ -54,9 +54,10 @@ class Ration(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     pet_id: str
     brand: str
-    food_type: str  # croquettes / pâtée / mixte
+    food_type: str  # croquettes / pâtée / mixte / ration ménagère
     daily_grams: float
     meals_per_day: int = 2
+    proteins: List[str] = []  # only for ration ménagère
     notes: Optional[str] = ""
     started_on: str = Field(default_factory=now_iso)
     is_current: bool = True
@@ -68,6 +69,7 @@ class RationCreate(BaseModel):
     food_type: str
     daily_grams: float
     meals_per_day: int = 2
+    proteins: List[str] = []
     notes: Optional[str] = ""
 
 
