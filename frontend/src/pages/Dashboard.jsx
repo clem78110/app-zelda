@@ -3,7 +3,8 @@ import { useAnimal } from "@/context/AnimalContext";
 import { api } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Link } from "react-router-dom";
-import { UtensilsCrossed, Stethoscope, Scale, Footprints, BookHeart, FileImage, ArrowRight } from "lucide-react";
+import { UtensilsCrossed, Stethoscope, Scale, Footprints, BookHeart, FileImage, ArrowRight, Camera } from "lucide-react";
+import { AvatarEditor } from "@/components/AvatarEditor";
 
 const StatCard = ({ to, icon: Icon, label, value, accent, testId }) => (
   <Link to={to} data-testid={testId} className="group">
@@ -28,6 +29,7 @@ const StatCard = ({ to, icon: Icon, label, value, accent, testId }) => (
 export default function Dashboard() {
   const { activePet } = useAnimal();
   const [stats, setStats] = useState(null);
+  const [avatarOpen, setAvatarOpen] = useState(false);
 
   useEffect(() => {
     if (!activePet) return;
@@ -65,11 +67,24 @@ export default function Dashboard() {
       {/* Hero */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#E9E3D3] via-[#F2EFE9] to-[#D0E5D8] p-6 md:p-8 border border-[#E9E3D3] grain">
         <div className="flex items-center gap-5">
-          <img
-            src={activePet.avatar_url}
-            alt={activePet.name}
-            className="w-20 h-20 md:w-24 md:h-24 rounded-3xl object-cover border-4 border-white shadow-sm"
-          />
+          <button
+            data-testid="open-avatar-editor"
+            onClick={() => setAvatarOpen(true)}
+            className="relative group flex-shrink-0"
+            aria-label="Modifier la photo"
+          >
+            <img
+              src={activePet.avatar_url}
+              alt={activePet.name}
+              className="w-20 h-20 md:w-24 md:h-24 rounded-3xl object-cover border-4 border-white shadow-sm"
+            />
+            <div className="absolute inset-0 rounded-3xl bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <Camera size={20} className="text-white" />
+            </div>
+            <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-[#4A7C59] border-2 border-white flex items-center justify-center shadow-md">
+              <Camera size={12} className="text-white" />
+            </div>
+          </button>
           <div>
             <div className="text-xs uppercase tracking-[0.2em] text-[#5C6B60] font-bold">Bonjour</div>
             <h1 className="text-3xl md:text-4xl font-extrabold text-[#2C3D30]" style={{ fontFamily: "Manrope" }}>
@@ -81,6 +96,8 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      <AvatarEditor open={avatarOpen} onOpenChange={setAvatarOpen} />
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">

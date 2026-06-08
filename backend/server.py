@@ -292,6 +292,26 @@ async def get_pet(pet_id: str):
     return pet
 
 
+class PetUpdate(BaseModel):
+    name: Optional[str] = None
+    breed: Optional[str] = None
+    birth_date: Optional[str] = None
+    avatar_url: Optional[str] = None
+    color: Optional[str] = None
+
+
+@api_router.patch("/pets/{pet_id}", response_model=Pet)
+async def update_pet(pet_id: str, payload: PetUpdate):
+    existing = await db.pets.find_one({"id": pet_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(404, "Pet not found")
+    update = {k: v for k, v in payload.model_dump().items() if v is not None}
+    if update:
+        await db.pets.update_one({"id": pet_id}, {"$set": update})
+    merged = {**existing, **update}
+    return Pet(**merged)
+
+
 # --- Rations ---
 @api_router.get("/rations", response_model=List[Ration])
 async def list_rations(pet_id: str):
