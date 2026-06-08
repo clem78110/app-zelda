@@ -13,13 +13,19 @@ import { fr } from "date-fns/locale";
 import { toast } from "sonner";
 
 const MOODS = [
-  { key: "super", label: "Super", color: "#4A7C59", emoji: "🌿" },
+  { key: "en_forme", label: "En forme", color: "#4A7C59", emoji: "🌿" },
   { key: "ok", label: "OK", color: "#6B8E9B", emoji: "🌤" },
-  { key: "inquiet", label: "Inquiet", color: "#C87941", emoji: "🍂" },
-  { key: "malade", label: "Malade", color: "#B75D5D", emoji: "🌧" },
+  { key: "fatigue", label: "Fatigué", color: "#C87941", emoji: "😴" },
+  { key: "raide", label: "Raide", color: "#B75D5D", emoji: "🦴" },
 ];
 
-const findMood = (k) => MOODS.find((m) => m.key === k) || MOODS[1];
+// Legacy keys → nouveau key (pour les notes créées avant le renommage)
+const MOOD_ALIASES = { super: "en_forme", inquiet: "fatigue", malade: "raide" };
+
+const findMood = (k) => {
+  const key = MOOD_ALIASES[k] || k;
+  return MOODS.find((m) => m.key === key) || MOODS[1];
+};
 
 const sameDay = (a, b) =>
   a.getFullYear() === b.getFullYear() &&
@@ -65,11 +71,11 @@ export default function Journal() {
 
   // Calendar data: for each mood, days that have at least one entry of that mood
   const daysByMood = useMemo(() => {
-    const m = { super: [], ok: [], inquiet: [], malade: [] };
+    const m = { en_forme: [], ok: [], fatigue: [], raide: [] };
     for (const j of items) {
       const d = new Date(j.date);
-      const k = j.mood && m[j.mood] ? j.mood : "ok";
-      // avoid duplicates same day same mood
+      const rawKey = MOOD_ALIASES[j.mood] || j.mood;
+      const k = m[rawKey] ? rawKey : "ok";
       if (!m[k].some((x) => sameDay(x, d))) m[k].push(d);
     }
     return m;
@@ -164,10 +170,10 @@ export default function Journal() {
               selected={selectedDate}
               onSelect={(d) => d && setSelectedDate(d)}
               modifiers={{
-                moodSuper: daysByMood.super,
+                moodSuper: daysByMood.en_forme,
                 moodOk: daysByMood.ok,
-                moodInquiet: daysByMood.inquiet,
-                moodMalade: daysByMood.malade,
+                moodInquiet: daysByMood.fatigue,
+                moodMalade: daysByMood.raide,
               }}
               modifiersClassNames={{
                 moodSuper: "relative font-bold after:content-[''] after:absolute after:left-1/2 after:-translate-x-1/2 after:bottom-1 after:w-1.5 after:h-1.5 after:rounded-full after:bg-[#4A7C59]",
