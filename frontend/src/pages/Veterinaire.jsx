@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAnimal } from "@/context/AnimalContext";
 import { api, fileToBase64 } from "@/lib/api";
 import { Card } from "@/components/ui/card";
@@ -10,7 +10,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, CalendarDays, FileImage, Sparkles, Upload, Check, Clock } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Plus, Trash2, CalendarDays, FileImage, Sparkles, Upload, Check, Clock, List, CalendarRange } from "lucide-react";
+import { fr } from "date-fns/locale";
 import { toast } from "sonner";
 import { ShareDialog } from "@/components/ShareDialog";
 
@@ -66,6 +68,8 @@ export default function Veterinaire() {
 
 const Appointments = ({ appts, reload, petId }) => {
   const [open, setOpen] = useState(false);
+  const [view, setView] = useState("calendar"); // calendar | list
+  const [selectedDate, setSelectedDate] = useState(new Date());
   const [form, setForm] = useState({
     title: "", date: new Date().toISOString().slice(0, 10), category: "consultation", vet_name: "", notes: "", done: false,
   });
@@ -89,13 +93,66 @@ const Appointments = ({ appts, reload, petId }) => {
 
   const remove = async (id) => { await api.delete(`/appointments/${id}`); reload(); };
 
+  const sameDay = (a, b) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+
+  const apptsByDay = useMemo(() => {
+    const m = new Map();
+    for (const a of appts) {
+      const d = new Date(a.date);
+      const k = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      if (!m.has(k)) m.set(k, []);
+      m.get(k).push(a);
+    }
+    return m;
+  }, [appts]);
+
+  const apptDays = useMemo(() => appts.map((a) => new Date(a.date)), [appts]);
+  const doneDays = useMemo(() => appts.filter((a) => a.done).map((a) => new Date(a.date)), [appts]);
+
+  const selectedAppts = useMemo(
+    () =>
+      appts
+        .filter((a) => sameDay(new Date(a.date), selectedDate))
+        .sort((x, y) => new Date(x.date) - new Date(y.date)),
+    [appts, selectedDate]
+  );
+
+  const openNewFor = (d) => {
+    setForm((p) => ({ ...p, date: d.toISOString().slice(0, 10) }));
+    setOpen(true);
+  };
+
   const now = new Date();
   const upcoming = appts.filter((a) => new Date(a.date) >= now && !a.done).sort((x, y) => new Date(x.date) - new Date(y.date));
   const past = appts.filter((a) => new Date(a.date) < now || a.done).sort((x, y) => new Date(y.date) - new Date(x.date));
 
   return (
     <div className="space-y-5">
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-1 p-1 rounded-full bg-[#F2EFE9] border border-[#E9E3D3]">
+          <button
+            data-testid="view-calendar-btn"
+            onClick={() => setView("calendar")}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition ${
+              view === "calendar" ? "bg-white text-[#2C3D30] shadow-sm" : "text-[#5C6B60]"
+            }`}
+          >
+            <CalendarRange size={14} /> Calendrier
+          </button>
+          <button
+            data-testid="view-list-btn"
+            onClick={() => setView("list")}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition ${
+              view === "list" ? "bg-white text-[#2C3D30] shadow-sm" : "text-[#5C6B60]"
+            }`}
+          >
+            <List size={14} /> Liste
+          </button>
+        </div>
+
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button data-testid="add-appt-btn" className="rounded-full bg-[#4A7C59] hover:bg-[#3B6347]">
@@ -138,13 +195,72 @@ const Appointments = ({ appts, reload, petId }) => {
         </Dialog>
       </div>
 
-      <Section title="À venir" empty="Aucun rendez-vous à venir" icon={<Clock size={16} />}>
-        {upcoming.map((a) => <ApptCard key={a.id} a={a} onToggle={toggleDone} onDelete={remove} />)}
-      </Section>
+      {view === "calendar" ? (
+        <div className="space-y-4" data-testid="calendar-view">
+          <Card className="p-2 sm:p-4 rounded-3xl border border-[#E9E3D3] bg-white">
+            <Calendar
+              mode="single"
+              locale={fr}
+              selected={selectedDate}
+              onSelect={(d) => d && setSelectedDate(d)}
+              modifiers={{ hasAppt: apptDays, doneAppt: doneDays }}
+              modifiersClassNames={{
+                hasAppt: "relative font-bold text-[#4A7C59] after:content-[''] after:absolute after:left-1/2 after:-translate-x-1/2 after:bottom-1 after:w-1.5 after:h-1.5 after:rounded-full after:bg-[#4A7C59]",
+                doneAppt: "after:bg-[#8A9A8E]",
+              }}
+              className="mx-auto"
+              classNames={{
+                day_selected: "bg-[#4A7C59] text-white hover:bg-[#3B6347] hover:text-white focus:bg-[#4A7C59] focus:text-white",
+                day_today: "bg-[#E9E3D3] text-[#2C3D30] font-bold",
+                head_cell: "text-[#8A9A8E] rounded-md w-9 font-semibold text-[0.72rem] uppercase tracking-wider",
+                cell: "relative p-0 text-center text-sm focus-within:relative focus-within:z-20 [&:has([aria-selected])]:rounded-full",
+                day: "h-9 w-9 p-0 font-normal rounded-full aria-selected:opacity-100 hover:bg-[#F2EFE9]",
+                caption_label: "text-base font-bold capitalize",
+                nav_button: "h-8 w-8 rounded-full hover:bg-[#F2EFE9] flex items-center justify-center text-[#5C6B60]",
+              }}
+            />
+            <div className="flex items-center justify-center gap-4 pt-3 border-t border-[#E9E3D3] text-[10px] text-[#8A9A8E] uppercase tracking-[0.18em] font-bold">
+              <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#4A7C59]" />à venir</div>
+              <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#8A9A8E]" />fait</div>
+            </div>
+          </Card>
 
-      <Section title="Historique" empty="Aucun rendez-vous passé" icon={<Check size={16} />}>
-        {past.map((a) => <ApptCard key={a.id} a={a} onToggle={toggleDone} onDelete={remove} past />)}
-      </Section>
+          <div data-testid="day-appts">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-[#2C3D30] font-bold capitalize" style={{ fontFamily: "Manrope" }}>
+                {selectedDate.toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                data-testid="add-appt-day-btn"
+                onClick={() => openNewFor(selectedDate)}
+                className="text-[#4A7C59] hover:bg-[#4A7C59]/10 rounded-full text-xs"
+              >
+                <Plus size={14} className="mr-1" /> Ajouter
+              </Button>
+            </div>
+            {selectedAppts.length === 0 ? (
+              <p className="text-sm text-[#8A9A8E] italic text-center py-6">Aucun rendez-vous ce jour-là.</p>
+            ) : (
+              <div className="space-y-2">
+                {selectedAppts.map((a) => (
+                  <ApptCard key={a.id} a={a} onToggle={toggleDone} onDelete={remove} past={a.done || new Date(a.date) < now} />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <>
+          <Section title="À venir" empty="Aucun rendez-vous à venir" icon={<Clock size={16} />}>
+            {upcoming.map((a) => <ApptCard key={a.id} a={a} onToggle={toggleDone} onDelete={remove} />)}
+          </Section>
+          <Section title="Historique" empty="Aucun rendez-vous passé" icon={<Check size={16} />}>
+            {past.map((a) => <ApptCard key={a.id} a={a} onToggle={toggleDone} onDelete={remove} past />)}
+          </Section>
+        </>
+      )}
     </div>
   );
 };
