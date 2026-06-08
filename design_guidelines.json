@@ -1,0 +1,89 @@
+{
+  "theme": "Light",
+  "archetype": "Organic & Earthy",
+  "design_philosophy": "Ecosia-style simplicity with a calm, tactile nature-inspired aesthetic. This is a mobile-first companion app for pet tracking. Emphasizes warm earth tones, rounded pebble-like shapes, and thumb-friendly navigation. The UI should feel like a serene, highly organized journal rather than a clinical medical tool.",
+  "colors": {
+    "background": {
+      "base": "#F9F8F6",
+      "surface": "#FFFFFF",
+      "surface_alt": "#F2EFE9",
+      "glass": "bg-white/70 backdrop-blur-xl"
+    },
+    "text": {
+      "primary": "#2C3D30",
+      "secondary": "#5C6B60",
+      "muted": "#8A9A8E"
+    },
+    "brand": {
+      "primary": "#4A7C59",
+      "primary_hover": "#3B6347",
+      "secondary": "#C87941",
+      "accent_sand": "#E9E3D3",
+      "accent_mint": "#D0E5D8"
+    },
+    "status": {
+      "success": "#4A7C59",
+      "warning": "#C87941",
+      "error": "#B75D5D",
+      "info": "#6B8E9B"
+    }
+  },
+  "typography": {
+    "font_families": {
+      "heading": "Manrope, sans-serif",
+      "body": "Work Sans, sans-serif"
+    },
+    "rules": {
+      "h1": "text-4xl md:text-5xl font-extrabold tracking-tight text-[#2C3D30]",
+      "h2": "text-2xl md:text-3xl font-bold tracking-tight text-[#2C3D30]",
+      "h3": "text-xl font-semibold text-[#2C3D30]",
+      "body": "text-base leading-relaxed text-[#5C6B60]",
+      "small_caps": "text-xs font-bold uppercase tracking-[0.2em] text-[#8A9A8E]"
+    }
+  },
+  "spacing_and_layout": {
+    "grid_system": "Mobile-first one-column layout natively, expanding to a Bento 'Control Room' dense grid on desktop (md:grid-cols-3 lg:grid-cols-4).",
+    "spacing_scale": "Generous organic padding. Use p-6 or p-8 inside cards to avoid text collision with borders.",
+    "border_radius": "Pebble-like softness. Use rounded-2xl (16px) or rounded-3xl (24px) for main containers and cards.",
+    "borders": "1px solid border-[#E9E3D3] on cards to define edges softly without heavy shadows."
+  },
+  "components": {
+    "animal_selector": "Top sticky navigation pill or glassmorphic segmented control. Must clearly indicate whether Zelda (Dog) or Maddie (Cat) is currently active.",
+    "cards": "Flat background with 1px soft border (border-[#E9E3D3]). No generic heavy drop shadows. Hover states should slightly lift (-translate-y-1) with a soft diffuse shadow.",
+    "buttons": "Fully rounded (rounded-full) for primary CTAs like 'Start Walk' or 'Add Log'. Background #4A7C59 with white text.",
+    "charts": "Recharts for weight tracking. Use monotoneX for smooth, natural curves. Stroke color #4A7C59, fill gradient from #4A7C59 (20% opacity) to transparent.",
+    "vet_calendar": "Horizontal scrolling date list for quick access, or small inline calendar. Use Shadcn calendar customized with warm nature colors.",
+    "ai_scan_button": "Prominent floating action button (FAB) or large card with camera icon, text 'Analyser un document'.",
+    "inputs": "Shadcn UI inputs heavily customized to have rounded-xl, border-[#E9E3D3], focus:ring-[#4A7C59] and focus:border-[#4A7C59]."
+  },
+  "media": {
+    "images": {
+      "zelda_dog_avatar": {
+        "url": "https://images.unsplash.com/photo-1524511751214-b0a384dd9afe?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1OTN8MHwxfHNlYXJjaHwxfHxoYXBweSUyMGRvZyUyMG91dGRvb3JzJTIwbmF0dXJlfGVufDB8fHx8MTc4MDkwNDE0NHww&ixlib=rb-4.1.0&q=85",
+        "description": "Zelda (Chienne) profile/avatar image"
+      },
+      "maddie_cat_avatar": {
+        "url": "https://images.unsplash.com/photo-1572897263855-ea51655f9f0b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDB8MHwxfHNlYXJjaHwxfHxjdXRlJTIwY2F0JTIwd2luZG93JTIwc3VubGlnaHR8ZW58MHx8fHwxNzgwOTA0MTU2fDA&ixlib=rb-4.1.0&q=85",
+        "description": "Maddie (Chatte) profile/avatar image"
+      },
+      "nature_background": {
+        "url": "https://images.unsplash.com/photo-1610653216265-74079d187414?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzV8MHwxfHNlYXJjaHwxfHxtaW5pbWFsaXN0JTIwbGVhZiUyMHBhdHRlcm4lMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc4MDkwNDE0NHww&ixlib=rb-4.1.0&q=85",
+        "description": "Subtle leaf pattern for header background or empty states"
+      }
+    },
+    "icons": "lucide-react for all icons. Stroke width 1.5 for a delicate, organic feel."
+  },
+  "animations": {
+    "transitions": "framer-motion for page transitions and tabs. Use gentle spring animations (stiffness: 300, damping: 30).",
+    "micro_interactions": "Scale down slightly on click (active:scale-95) for buttons to make them feel tactile."
+  },
+  "instructions_to_main_agent": [
+    "Build a mobile-first dashboard handling two states: Zelda (Dog) and Maddie (Cat). All data/cards should react to the active animal.",
+    "Implement Shadcn UI but override default styles to match the 'Organic & Earthy' archetype (no default Vercel-like borders or shadows).",
+    "Ensure all text is in French as requested ('Tableau de bord', 'Rations', 'Fichiers Vétérinaires', 'Poids', 'Balades').",
+    "Use Recharts for the weight tracking component.",
+    "Create a GPS/Pedometer card specifically shown when Zelda is selected.",
+    "Add data-testid attributes to all interactive elements for robust testing.",
+    "Use the provided Unsplash URLs for the pet avatars to bring the dashboard to life."
+  ]
+}
