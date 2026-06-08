@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAnimal } from "@/context/AnimalContext";
 import { api } from "@/lib/api";
 import { Card } from "@/components/ui/card";
@@ -15,17 +15,19 @@ import { Plus, Trash2, UtensilsCrossed, X } from "lucide-react";
 import { toast } from "sonner";
 
 const DEFAULT_PROTEINS = [
-  { key: "dinde", label: "Dinde", emoji: "🦃" },
-  { key: "poulet", label: "Poulet", emoji: "🍗" },
-  { key: "coeur_dinde", label: "Cœur de dinde", emoji: "❤️" },
-  { key: "maquereau", label: "Maquereau", emoji: "🐟" },
-  { key: "sardine", label: "Sardine", emoji: "🐟" },
-  { key: "eperlans", label: "Éperlans", emoji: "🐟" },
-  { key: "moules", label: "Moules", emoji: "🦪" },
+  { key: "Dinde", emoji: "🦃" },
+  { key: "Poulet", emoji: "🍗" },
+  { key: "Cœur de dinde", emoji: "❤️" },
+  { key: "Maquereau", emoji: "🐟" },
+  { key: "Sardine", emoji: "🐟" },
+  { key: "Éperlans", emoji: "🐟" },
+  { key: "Moules", emoji: "🦪" },
 ];
 
+const findMeta = (name) => DEFAULT_PROTEINS.find((p) => p.key === name);
+
 const emptyForm = {
-  brand: "", food_type: "ration ménagère", daily_grams: 200, meals_per_day: 2,
+  brand: "", food_type: "ration ménagère", daily_grams: 0, meals_per_day: 2,
   proteins: [], notes: "",
 };
 
@@ -38,6 +40,11 @@ export default function Rations() {
 
   const isMenagere = form.food_type === "ration ménagère";
 
+  const proteinSum = useMemo(
+    () => form.proteins.reduce((s, p) => s + (Number(p.grams) || 0), 0),
+    [form.proteins]
+  );
+
   const load = async () => {
     if (!activePet) return;
     try {
@@ -47,33 +54,50 @@ export default function Rations() {
   };
   useEffect(() => { load(); }, [activePet?.id]);
 
-  const toggleProtein = (key) => {
+  const toggleProtein = (name) => {
+    setForm((p) => {
+      const has = p.proteins.find((x) => x.name === name);
+      const proteins = has
+        ? p.proteins.filter((x) => x.name !== name)
+        : [...p.proteins, { name, grams: 0 }];
+      return { ...p, proteins };
+    });
+  };
+
+  const setProteinGrams = (name, grams) => {
     setForm((p) => ({
       ...p,
-      proteins: p.proteins.includes(key)
-        ? p.proteins.filter((x) => x !== key)
-        : [...p.proteins, key],
+      proteins: p.proteins.map((x) => (x.name === name ? { ...x, grams } : x)),
     }));
   };
 
   const addCustomProtein = () => {
     const v = customProtein.trim();
     if (!v) return;
-    if (form.proteins.includes(v)) { setCustomProtein(""); return; }
-    setForm((p) => ({ ...p, proteins: [...p.proteins, v] }));
+    if (form.proteins.some((x) => x.name.toLowerCase() === v.toLowerCase())) { setCustomProtein(""); return; }
+    setForm((p) => ({ ...p, proteins: [...p.proteins, { name: v, grams: 0 }] }));
     setCustomProtein("");
   };
 
   const submit = async () => {
     if (!isMenagere && !form.brand) return toast.error("Marque requise");
     if (isMenagere && form.proteins.length === 0) return toast.error("Sélectionnez au moins une protéine");
+
+    const proteinsClean = form.proteins.map((p) => ({ name: p.name, grams: Number(p.grams) || 0 }));
+    const daily = isMenagere
+      ? proteinsClean.reduce((s, p) => s + p.grams, 0)
+      : Number(form.daily_grams);
+
+    if (daily <= 0) return toast.error("Indiquez une quantité quotidienne");
+
     try {
       await api.post("/rations", {
         ...form,
         brand: form.brand || (isMenagere ? "Ration maison" : ""),
         pet_id: activePet.id,
-        daily_grams: Number(form.daily_grams),
+        daily_grams: daily,
         meals_per_day: Number(form.meals_per_day),
+        proteins: proteinsClean,
       });
       toast.success("Ration enregistrée");
       setOpen(false);
@@ -88,9 +112,6 @@ export default function Rations() {
   const remove = async (id) => {
     try { await api.delete(`/rations/${id}`); load(); } catch { toast.error("Suppression impossible"); }
   };
-
-  const proteinLabel = (key) =>
-    DEFAULT_PROTEINS.find((p) => p.key === key)?.label || key;
 
   const current = items.find((i) => i.is_current);
   const history = items.filter((i) => !i.is_current);
@@ -125,72 +146,105 @@ export default function Rations() {
               </div>
 
               {isMenagere ? (
-                <div>
-                  <Label className="block mb-2">Protéines</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {DEFAULT_PROTEINS.map((p) => {
-                      const on = form.proteins.includes(p.key);
-                      return (
-                        <button
-                          key={p.key}
-                          type="button"
-                          data-testid={`protein-${p.key}`}
-                          onClick={() => toggleProtein(p.key)}
-                          className={`px-3 py-1.5 rounded-full text-sm font-semibold border transition ${
-                            on
-                              ? "bg-[#4A7C59] text-white border-[#4A7C59]"
-                              : "bg-white text-[#5C6B60] border-[#E9E3D3] hover:bg-[#F2EFE9]"
-                          }`}
-                        >
-                          <span className="mr-1">{p.emoji}</span>{p.label}
-                        </button>
-                      );
-                    })}
-                    {form.proteins
-                      .filter((k) => !DEFAULT_PROTEINS.some((p) => p.key === k))
-                      .map((k) => (
-                        <button
-                          key={k}
-                          type="button"
-                          onClick={() => toggleProtein(k)}
-                          className="px-3 py-1.5 rounded-full text-sm font-semibold bg-[#4A7C59] text-white border border-[#4A7C59] flex items-center gap-1"
-                        >
-                          {k}<X size={12} />
-                        </button>
-                      ))}
+                <>
+                  <div>
+                    <Label className="block mb-2">Choisir les protéines</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {DEFAULT_PROTEINS.map((p) => {
+                        const on = form.proteins.some((x) => x.name === p.key);
+                        return (
+                          <button
+                            key={p.key}
+                            type="button"
+                            data-testid={`protein-${p.key.toLowerCase().replace(/\s|œ/g, "_")}`}
+                            onClick={() => toggleProtein(p.key)}
+                            className={`px-3 py-1.5 rounded-full text-sm font-semibold border transition ${
+                              on
+                                ? "bg-[#4A7C59] text-white border-[#4A7C59]"
+                                : "bg-white text-[#5C6B60] border-[#E9E3D3] hover:bg-[#F2EFE9]"
+                            }`}
+                          >
+                            <span className="mr-1">{p.emoji}</span>{p.key}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-2 flex gap-2">
+                      <Input
+                        data-testid="custom-protein-input"
+                        placeholder="Autre protéine…"
+                        value={customProtein}
+                        onChange={(e) => setCustomProtein(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustomProtein(); } }}
+                      />
+                      <Button type="button" data-testid="add-custom-protein-btn" variant="outline" onClick={addCustomProtein} className="rounded-full border-[#E9E3D3]">
+                        Ajouter
+                      </Button>
+                    </div>
                   </div>
-                  <div className="mt-2 flex gap-2">
-                    <Input
-                      data-testid="custom-protein-input"
-                      placeholder="Autre protéine…"
-                      value={customProtein}
-                      onChange={(e) => setCustomProtein(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustomProtein(); } }}
-                    />
-                    <Button type="button" data-testid="add-custom-protein-btn" variant="outline" onClick={addCustomProtein} className="rounded-full border-[#E9E3D3]">
-                      Ajouter
-                    </Button>
-                  </div>
-                </div>
+
+                  {form.proteins.length > 0 && (
+                    <div className="space-y-2 p-3 rounded-2xl bg-[#F2EFE9]/60 border border-[#E9E3D3]">
+                      <Label className="block">Quantité par protéine (g / jour)</Label>
+                      {form.proteins.map((p) => {
+                        const meta = findMeta(p.name);
+                        return (
+                          <div key={p.name} className="flex items-center gap-2">
+                            <div className="flex-1 text-sm font-medium flex items-center gap-1.5 min-w-0">
+                              {meta && <span>{meta.emoji}</span>}
+                              <span className="truncate">{p.name}</span>
+                            </div>
+                            <div className="relative">
+                              <Input
+                                data-testid={`grams-${p.name.toLowerCase().replace(/\s|œ/g, "_")}`}
+                                type="number"
+                                inputMode="numeric"
+                                min="0"
+                                step="5"
+                                value={p.grams}
+                                onChange={(e) => setProteinGrams(p.name, e.target.value)}
+                                className="w-24 pr-8 text-right"
+                              />
+                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#8A9A8E]">g</span>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => toggleProtein(p.name)}
+                            >
+                              <X size={14} className="text-[#8A9A8E]" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                      <div className="flex items-center justify-between pt-2 border-t border-[#E9E3D3]">
+                        <div className="text-[10px] uppercase tracking-[0.18em] text-[#8A9A8E] font-bold">Total / jour</div>
+                        <div className="text-lg font-extrabold" style={{ fontFamily: "Manrope" }}>{proteinSum} g</div>
+                      </div>
+                    </div>
+                  )}
+                </>
               ) : (
-                <div>
-                  <Label>Marque</Label>
-                  <Input data-testid="ration-brand" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} placeholder="Royal Canin…" />
-                </div>
+                <>
+                  <div>
+                    <Label>Marque</Label>
+                    <Input data-testid="ration-brand" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} placeholder="Royal Canin…" />
+                  </div>
+                  <div>
+                    <Label>Grammes / jour</Label>
+                    <Input data-testid="ration-grams" type="number" value={form.daily_grams} onChange={(e) => setForm({ ...form, daily_grams: e.target.value })} />
+                  </div>
+                </>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Grammes / jour</Label>
-                  <Input data-testid="ration-grams" type="number" value={form.daily_grams} onChange={(e) => setForm({ ...form, daily_grams: e.target.value })} />
-                </div>
-                <div>
-                  <Label>Repas / jour</Label>
-                  <Input data-testid="ration-meals" type="number" value={form.meals_per_day} onChange={(e) => setForm({ ...form, meals_per_day: e.target.value })} />
-                </div>
+              <div>
+                <Label>Repas / jour</Label>
+                <Input data-testid="ration-meals" type="number" value={form.meals_per_day} onChange={(e) => setForm({ ...form, meals_per_day: e.target.value })} />
               </div>
               <div>
-                <Label>Notes (recette, proportions…)</Label>
+                <Label>Notes (recette, supplémentation…)</Label>
                 <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} />
               </div>
               <Button data-testid="save-ration-btn" onClick={submit} className="w-full rounded-full bg-[#4A7C59] hover:bg-[#3B6347]">Enregistrer</Button>
@@ -211,13 +265,17 @@ export default function Rations() {
           <div className="text-sm text-[#5C6B60] mt-1">{current.food_type}</div>
 
           {current.proteins?.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {current.proteins.map((k) => {
-                const p = DEFAULT_PROTEINS.find((x) => x.key === k);
+            <div className="mt-4 space-y-1.5">
+              {current.proteins.map((p) => {
+                const meta = findMeta(p.name);
                 return (
-                  <Badge key={k} variant="outline" className="border-[#E9E3D3] bg-white text-[#2C3D30] font-medium">
-                    {p ? <span className="mr-1">{p.emoji}</span> : null}{proteinLabel(k)}
-                  </Badge>
+                  <div key={p.name} className="flex items-center justify-between text-sm py-1 border-b border-[#E9E3D3]/50 last:border-0">
+                    <div className="flex items-center gap-1.5">
+                      {meta && <span>{meta.emoji}</span>}
+                      <span className="font-medium">{p.name}</span>
+                    </div>
+                    <div className="font-bold text-[#2C3D30]">{p.grams} g</div>
+                  </div>
                 );
               })}
             </div>
@@ -251,7 +309,7 @@ export default function Rations() {
                   <div className="font-semibold truncate">{r.brand} · <span className="text-[#5C6B60] font-normal">{r.food_type}</span></div>
                   {r.proteins?.length > 0 && (
                     <div className="text-xs text-[#5C6B60] mt-0.5 truncate">
-                      {r.proteins.map(proteinLabel).join(" · ")}
+                      {r.proteins.map((p) => `${p.name} ${p.grams}g`).join(" · ")}
                     </div>
                   )}
                   <div className="text-xs text-[#8A9A8E]">{r.daily_grams}g/j — {new Date(r.started_on).toLocaleDateString("fr-FR")}</div>
