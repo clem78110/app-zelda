@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2, CalendarDays, FileImage, Sparkles, Upload, Check, Clock } from "lucide-react";
 import { toast } from "sonner";
+import { ShareDialog } from "@/components/ShareDialog";
 
 const CAT_APPT = ["consultation", "vaccin", "traitement", "chirurgie", "contrôle", "vermifuge"];
 const CAT_FILE = ["ordonnance", "vaccin", "facture", "radio", "analyse", "autre"];
@@ -34,9 +35,12 @@ export default function Veterinaire() {
 
   return (
     <div className="space-y-6" data-testid="vet-page">
-      <div>
-        <h1 className="text-3xl font-extrabold" style={{ fontFamily: "Manrope" }}>Vétérinaire</h1>
-        <p className="text-sm text-[#5C6B60]">Rendez-vous, fichiers et analyse IA</p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-3xl font-extrabold" style={{ fontFamily: "Manrope" }}>Vétérinaire</h1>
+          <p className="text-sm text-[#5C6B60]">Rendez-vous, fichiers et analyse IA</p>
+        </div>
+        <ShareDialog />
       </div>
 
       <Tabs defaultValue="appts">

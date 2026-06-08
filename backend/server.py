@@ -6,8 +6,10 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import base64
 import logging
+import secrets
 import uuid
 from pathlib import Path
+from datetime import timedelta
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
 from datetime import datetime, timezone
@@ -171,6 +173,22 @@ class AIAnalyzeRequest(BaseModel):
     image_base64: str
     mime_type: str = "image/jpeg"
     context: Optional[str] = ""
+
+
+class ShareLink(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    pet_id: str
+    token: str = Field(default_factory=lambda: secrets.token_urlsafe(16))
+    label: Optional[str] = ""
+    expires_at: Optional[str] = None  # ISO date or null = never
+    created_at: str = Field(default_factory=now_iso)
+
+
+class ShareCreate(BaseModel):
+    pet_id: str
+    label: Optional[str] = ""
+    expires_in_days: Optional[int] = 30  # null => no expiry
 
 
 # ============ SEED ============
@@ -409,6 +427,64 @@ async def analyze_document(payload: AIAnalyzeRequest):
     except Exception as e:
         logger.exception("AI analyze error")
         raise HTTPException(500, f"Erreur d'analyse IA: {str(e)}")
+
+
+# --- Shares (dossier véto partagé) ---
+@api_router.get("/shares", response_model=List[ShareLink])
+async def list_shares(pet_id: str):
+    items = await db.shares.find({"pet_id": pet_id}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return items
+
+
+@api_router.post("/shares", response_model=ShareLink)
+async def create_share(payload: ShareCreate):
+    expires_at = None
+    if payload.expires_in_days and payload.expires_in_days > 0:
+        expires_at = (datetime.now(timezone.utc) + timedelta(days=payload.expires_in_days)).isoformat()
+    link = ShareLink(pet_id=payload.pet_id, label=payload.label or "", expires_at=expires_at)
+    await db.shares.insert_one(link.model_dump())
+    return link
+
+
+@api_router.delete("/shares/{share_id}")
+async def delete_share(share_id: str):
+    res = await db.shares.delete_one({"id": share_id})
+    return {"deleted": res.deleted_count}
+
+
+@api_router.get("/public/share/{token}")
+async def get_public_share(token: str):
+    share = await db.shares.find_one({"token": token}, {"_id": 0})
+    if not share:
+        raise HTTPException(404, "Lien de partage introuvable")
+    if share.get("expires_at"):
+        try:
+            exp = datetime.fromisoformat(share["expires_at"])
+            if exp < datetime.now(timezone.utc):
+                raise HTTPException(410, "Ce lien de partage a expiré")
+        except ValueError:
+            pass
+
+    pet_id = share["pet_id"]
+    pet = await db.pets.find_one({"id": pet_id}, {"_id": 0})
+    if not pet:
+        raise HTTPException(404, "Animal introuvable")
+
+    appointments = await db.appointments.find({"pet_id": pet_id}, {"_id": 0}).sort("date", -1).to_list(500)
+    files = await db.vetfiles.find({"pet_id": pet_id}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    weights = await db.weights.find({"pet_id": pet_id}, {"_id": 0}).sort("date", 1).to_list(500)
+    rations = await db.rations.find({"pet_id": pet_id}, {"_id": 0}).sort("started_on", -1).to_list(200)
+    journal = await db.journal.find({"pet_id": pet_id}, {"_id": 0}).sort("date", -1).to_list(500)
+
+    return {
+        "pet": pet,
+        "share": {"label": share.get("label", ""), "expires_at": share.get("expires_at")},
+        "appointments": appointments,
+        "files": files,
+        "weights": weights,
+        "rations": rations,
+        "journal": journal,
+    }
 
 
 app.include_router(api_router)
